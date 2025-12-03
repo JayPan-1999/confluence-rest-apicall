@@ -1,0 +1,147 @@
+# Confluence Webhook API 测试
+# 使用VS Code的REST Client扩展来运行这些测试
+
+@baseUrl = http://localhost:7072/api/confluencewebhook
+
+### 1. 健康检查
+GET {{baseUrl}}
+
+### 2. 模拟页面创建事件
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+  "eventType": "page_created",
+  "user": {
+    "displayName": "测试用户",
+    "userKey": "test-user-key",
+    "email": "test@example.com"
+  },
+  "page": {
+    "id": "123456789",
+    "title": "测试页面标题",
+    "status": "current",
+    "space": {
+      "key": "TEST",
+      "name": "测试空间"
+    },
+    "version": {
+      "number": 1
+    }
+  },
+  "timestamp": 1700925000000
+}
+
+### 3. 模拟页面发布事件
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+  "eventType": "page_published",
+  "user": {
+    "displayName": "发布用户",
+    "userKey": "publisher-key",
+    "email": "publisher@example.com"
+  },
+  "page": {
+    "id": "987654321",
+    "title": "已发布页面",
+    "status": "current",
+    "space": {
+      "key": "PROD",
+      "name": "生产空间"
+    },
+    "version": {
+      "number": 2
+    }
+  },
+  "timestamp": 1700925060000
+}
+
+### 4. 模拟页面更新事件
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+  "eventType": "page_updated",
+  "user": {
+    "displayName": "编辑用户",
+    "userKey": "editor-key",
+    "email": "editor@example.com"
+  },
+  "page": {
+    "id": "456789123",
+    "title": "已更新页面",
+    "status": "current",
+    "space": {
+      "key": "DEV",
+      "name": "开发空间"
+    },
+    "version": {
+      "number": 3
+    }
+  },
+  "timestamp": 1700925120000
+}
+
+### 5. 添加页面标签 (PUT)
+PUT {{baseUrl}}
+Content-Type: application/json
+
+{
+  "pageId": "123456789",
+  "operation": "addLabel",
+  "labelName": "urgent"
+}
+
+### 6. 添加页面评论 (PUT)
+PUT {{baseUrl}}
+Content-Type: application/json
+
+{
+  "pageId": "123456789",
+  "operation": "addComment",
+  "comment": "这是一个通过webhook自动添加的评论"
+}
+
+### 7. 更新页面状态 (PUT)
+PUT {{baseUrl}}
+Content-Type: application/json
+
+{
+  "pageId": "123456789",
+  "operation": "updateStatus",
+  "status": "draft"
+}
+
+### 8. 获取页面信息 (DELETE)
+DELETE {{baseUrl}}?pageId=123456789&operation=getInfo
+
+### 9. 标记页面为删除 (DELETE)
+DELETE {{baseUrl}}?pageId=123456789&operation=addDeletedLabel
+
+### 10. 测试无效的事件类型
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+  "eventType": "invalid_event",
+  "user": {
+    "displayName": "测试用户",
+    "userKey": "test-user",
+    "email": "test@example.com"
+  },
+  "timestamp": 1700925180000
+}
+
+### 11. 测试无效的PUT操作
+PUT {{baseUrl}}
+Content-Type: application/json
+
+{
+  "pageId": "123456789",
+  "operation": "invalidOperation"
+}
+
+### 12. 测试无效的DELETE操作
+DELETE {{baseUrl}}?pageId=123456789&operation=invalidOperation
