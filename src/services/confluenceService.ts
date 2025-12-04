@@ -33,11 +33,100 @@ export interface ConfluenceWebhookEvent {
     timestamp: number;
 }
 
-enum STATES_ID {
+enum States_ID {
     'draft' = 46563358,
     'pending ITL review' = 46596153,
     'pending BU review' = 46891023,
     'published' = 46891024
+}
+enum States_Enum {
+    DRAFT = 'draft',
+    PENDING_ITL_REVIEW = 'pending ITL review',
+    PENDING_BU_REVIEW = 'pending BU review',
+    PUBLISHED = 'published'
+}
+
+interface StatesChangeResult {
+    success: boolean;
+    newStatus?: States_Enum;
+}
+
+type Page_Action = 'approve' | 'reject' | 're-review';
+
+function handleStatusChange(
+    currentStatus: States_Enum,
+    action: Page_Action
+): StatesChangeResult {
+    // 根据当前状态 + 操作，匹配新状态
+    if (action === 're-review') {
+        return {
+            success: true,
+            newStatus: States_Enum.PENDING_ITL_REVIEW,
+        }
+    }
+    switch (currentStatus) {
+        case States_Enum.DRAFT:
+            if (action === 'approve') {
+                return {
+                    success: true,
+                    newStatus: States_Enum.PENDING_ITL_REVIEW,
+                };
+            } else {
+                // draft 状态 reject 可根据业务需求调整（示例：保持原状态）
+                return {
+                    success: false,
+                    newStatus: States_Enum.DRAFT,
+                };
+            }
+
+        case States_Enum.PENDING_ITL_REVIEW:
+            if (action === 'approve') {
+                // ITL审核通过，进入待BU审核
+                return {
+                    success: true,
+                    newStatus: States_Enum.PENDING_BU_REVIEW,
+                };
+            } else {
+                // ITL审核驳回，退回草稿（可根据业务调整）
+                return {
+                    success: true,
+                    newStatus: States_Enum.DRAFT,
+                };
+            }
+
+        case States_Enum.PENDING_BU_REVIEW:
+            if (action === 'approve') {
+                // BU审核通过，发布
+                return {
+                    success: true,
+                    newStatus: States_Enum.PUBLISHED,
+                };
+            } else {
+                // BU审核驳回，退回待ITL审核（核心规则）
+                return {
+                    success: true,
+                    newStatus: States_Enum.PENDING_ITL_REVIEW,
+                };
+            }
+
+        case States_Enum.PUBLISHED:
+            if (action === 'approve') {
+                return {
+                    success: false,
+                };
+            } else {
+                // draft 状态 reject 可根据业务需求调整（示例：保持原状态）
+                return {
+                    success: true,
+                    newStatus: States_Enum.PENDING_BU_REVIEW,
+                };
+            }
+        // 未定义状态兜底
+        default:
+            return {
+                success: false,
+            };
+    }
 }
 
 export class ConfluenceService {
@@ -175,23 +264,10 @@ export class ConfluenceService {
     /**
      * 修改页面状态
      */
-    async changePageStatus(pageId: string, curState: string, buttonType: 'approve' | 'reject'): Promise<any> {
-        // 
-        const nextApprovaledStateId = {
-            'pending ITL review': 'pending BU review',
-            'pending BU review': 'published'
-        }
-        const nextRejectedStateId = {
-            'published': 'pending BU review',
-            'pending BU review': 'pending ITL review',
-            'pending ITL review': 'draft',
-        }
-
-        const stateId = buttonType === 'approve' ? nextApprovaledStateId[curState] : nextRejectedStateId[curState];
-
+    async changePageStatus(pageId: string, curState: string): Promise<any> {
         try {
             const response = await this.client.put(`/rest/api/content/${pageId}/state?status=current`, {
-                id: STATES_ID[stateId],
+                id: States_ID[curState],
             });
             return response.data;
         } catch (error) {
@@ -292,11 +368,17 @@ export class ConfluenceService {
     /**
      * 根据请求类型获取当前需要发送邮件的群组
      */
-    async getGroupNameByButtonType(pageId: string): Promise<{ groupname: string; authorId: string | null }> {
+    async getGroupNameAndStateByButtonType(pageId: string, buttonType?: Page_Action): Promise<{ groupname: string; authorId: string | null, newState?: string }> {
         try {
             // 获取全部页面标题
             let { groupname, states, authorId } = await this.getFullPageTitle(pageId);
-            const currentState = states.data.contentState.name;
+            let currentState = states.data.contentState.name;
+            if (buttonType) {
+                const res = handleStatusChange(currentState as States_Enum, buttonType);
+                if (res.success && res.newStatus) {
+                    currentState = res.newStatus;
+                }
+            }
             if (currentState === 'pending ITL review') {
                 groupname += '-INTERNAL'
             }
@@ -306,7 +388,7 @@ export class ConfluenceService {
             if (authorId && currentState === 'draft') {
                 groupname = 'OWNER'
             }
-            return { groupname, authorId };
+            return { groupname, authorId, newState: currentState };
         } catch (error) {
             console.error('Error fetching group name by button type:', error);
             throw error;
@@ -344,13 +426,16 @@ export class ConfluenceService {
 
         try {
             switch (event.eventType) {
-                case 'page_updated_publish_get_emails':
+                case 'page_updated_get_emails':
                     // 获取全部页面标题
-                    const { groupname } = await this.getGroupNameByButtonType(page.id);
+                    const { groupname, newState } = await this.getGroupNameAndStateByButtonType(page.id, buttonType);
                     // 获取对应群组信息
                     if (groupname !== 'OWNER') {
-                        const emails = await this.getGroupEmails(groupname);
+                        const [emails, _] = await Promise.all([this.getGroupEmails(groupname), this.changePageStatus(page.id, newState)]);
                         result = { emails };
+                    }
+                    else {
+                        await this.changePageStatus(page.id, newState);
                     }
                     break;
                 case 'get_all_states':
