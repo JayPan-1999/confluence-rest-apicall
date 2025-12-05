@@ -130,6 +130,6 @@ export async function confluencewebhook(request: HttpRequest, context: Invocatio
 
 app.http('confluencewebhook', {
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     handler: confluencewebhook
 });
