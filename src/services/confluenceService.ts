@@ -385,6 +385,9 @@ export class ConfluenceService {
             if (currentState === 'pending BU review') {
                 groupname += '-EXTERNAL'
             }
+            if (currentState === 'published') {
+                groupname = 'END'
+            }
             if (authorId && currentState === 'draft') {
                 groupname = 'OWNER'
             }
@@ -430,7 +433,7 @@ export class ConfluenceService {
                     // 获取全部页面标题
                     const { groupname, newState } = await this.getGroupNameAndStateByButtonType(page.id, buttonType);
                     // 获取对应群组信息
-                    if (groupname !== 'OWNER') {
+                    if (groupname !== 'OWNER' && groupname !== 'END') {
                         const [emails, _] = await Promise.all([this.getGroupEmails(groupname), this.changePageStatus(page.id, newState)]);
                         result = { emails };
                     }
