@@ -124,82 +124,6 @@ function extractContentInParentheses(str: string): string {
     return match ? match[1] : "";
 }
 
-function handleStatusChange(
-    currentStatus: States_Enum,
-    action: Page_Action
-): StatesChangeResult {
-    // 根据当前状态 + 操作，匹配新状态
-    if (action === "re-review") {
-        return {
-            success: true,
-            newStatus: States_Enum.PENDING_ITL_REVIEW,
-        };
-    }
-    switch (currentStatus) {
-        case States_Enum.DRAFT:
-            if (action === "approve") {
-                return {
-                    success: true,
-                    newStatus: States_Enum.PENDING_ITL_REVIEW,
-                };
-            } else {
-                // draft 状态 reject 可根据业务需求调整（示例：保持原状态）
-                return {
-                    success: false,
-                    newStatus: States_Enum.DRAFT,
-                };
-            }
-
-        case States_Enum.PENDING_ITL_REVIEW:
-            if (action === "approve") {
-                // ITL审核通过，进入待BU审核
-                return {
-                    success: true,
-                    newStatus: States_Enum.PENDING_BU_REVIEW,
-                };
-            } else {
-                // ITL审核驳回，退回草稿（可根据业务调整）
-                return {
-                    success: true,
-                    newStatus: States_Enum.DRAFT,
-                };
-            }
-
-        case States_Enum.PENDING_BU_REVIEW:
-            if (action === "approve") {
-                // BU审核通过，发布
-                return {
-                    success: true,
-                    newStatus: States_Enum.PUBLISHED,
-                };
-            } else {
-                // BU审核驳回，退回待ITL审核（核心规则）
-                return {
-                    success: true,
-                    newStatus: States_Enum.PENDING_ITL_REVIEW,
-                };
-            }
-
-        case States_Enum.PUBLISHED:
-            if (action === "approve") {
-                return {
-                    success: false,
-                };
-            } else {
-                // draft 状态 reject 可根据业务需求调整（示例：保持原状态）
-                return {
-                    success: true,
-                    newStatus: States_Enum.PENDING_BU_REVIEW,
-                };
-            }
-        // 未定义状态兜底
-        default:
-            return {
-                success: false,
-            };
-    }
-}
-
 export class ConfluenceService {
     private client: AxiosInstance;
 
@@ -210,7 +134,7 @@ export class ConfluenceService {
 
         if (!baseURL || !username || !apiToken) {
             throw new Error(
-                "Missing Confluence configuration in environment variables"
+                "Missing Confluence configuration in environment variables",
             );
         }
 
@@ -275,7 +199,7 @@ export class ConfluenceService {
     async getGroupInfo(groupId: string): Promise<any> {
         try {
             const response = await this.client.get(
-                `/rest/api/group/${groupId}/membersByGroupId`
+                `/rest/api/group/${groupId}/membersByGroupId`,
             );
             return response.data;
         } catch (error) {
@@ -316,7 +240,7 @@ export class ConfluenceService {
     async getPageStatus(pageId: string): Promise<any> {
         try {
             const state = await this.client.get(
-                `/rest/api/content/${pageId}/state`
+                `/rest/api/content/${pageId}/state`,
             );
             return state;
         } catch (error) {
@@ -331,7 +255,7 @@ export class ConfluenceService {
     async getAllPageStates(spaceKey: string): Promise<any> {
         try {
             const response = await this.client.get(
-                `/rest/api/space/${spaceKey}/state/settings`
+                `/rest/api/space/${spaceKey}/state/settings`,
             );
             return response.data;
         } catch (error) {
@@ -346,26 +270,25 @@ export class ConfluenceService {
     async changePageStatus(
         pageId: string,
         curState: string,
-        spaceKey: string
+        spaceKey: string,
     ): Promise<any> {
         try {
-            const { spaceContentStates } = await this.getAllPageStates(
-                spaceKey
-            );
+            const { spaceContentStates } =
+                await this.getAllPageStates(spaceKey);
             const id = spaceContentStates.find(
                 (state: any) =>
-                    state.name.toLowerCase() === curState.toLowerCase()
+                    state.name.toLowerCase() === curState.toLowerCase(),
             )?.id;
             if (!id) {
                 throw new Error(
-                    `State "${curState}" not found in space "${spaceKey}"`
+                    `State "${curState}" not found in space "${spaceKey}"`,
                 );
             }
             const response = await this.client.put(
                 `/rest/api/content/${pageId}/state?status=current`,
                 {
                     id,
-                }
+                },
             );
             return response.data;
         } catch (error) {
@@ -399,7 +322,7 @@ export class ConfluenceService {
 
             const response = await this.client.put(
                 `/content/${pageId}`,
-                updateData
+                updateData,
             );
             return response.data;
         } catch (error) {
@@ -414,7 +337,7 @@ export class ConfluenceService {
     async getPageLabels(pageId: string): Promise<any> {
         try {
             const response = await this.client.get(
-                `/api/v2/pages/${pageId}/labels`
+                `/api/v2/pages/${pageId}/labels`,
             );
             return response.data;
         } catch (error) {
@@ -428,7 +351,7 @@ export class ConfluenceService {
      */
 
     async getFullPageTitle(
-        pageId: string
+        pageId: string,
     ): Promise<{ groupname: string; states: any }> {
         try {
             let titles: string[] = [];
@@ -448,7 +371,7 @@ export class ConfluenceService {
     }
 
     async getNewGroupAndPageName(
-        pageId: string
+        pageId: string,
     ): Promise<{ groupname: string; states: any; pageTitle: string }> {
         try {
             const states = await this.getPageStatus(pageId);
@@ -491,7 +414,7 @@ export class ConfluenceService {
     async getGroupNameAndStateByButtonType(
         pageId: string,
         buttonType?: Page_Action,
-        originState?: States_Enum
+        originState?: States_Enum,
     ): Promise<{
         newState?: string;
         toGroups: string[];
@@ -561,7 +484,7 @@ export class ConfluenceService {
     getEmailTemplate(
         buttonType: Page_Action,
         originState: States_Enum,
-        pageTitle: string
+        pageTitle: string,
     ): string {
         let template = "";
         if (buttonType === "approve") {
@@ -605,21 +528,21 @@ export class ConfluenceService {
                         await this.getGroupNameAndStateByButtonType(
                             page.id,
                             buttonType,
-                            originState
+                            originState,
                         );
                     // 获取对应群组信息
                     let toEmails = await Promise.all(
                         toGroups.map((groupname) =>
-                            this.getGroupEmails(groupname)
-                        )
+                            this.getGroupEmails(groupname),
+                        ),
                     );
                     let ccEmails = await Promise.all(
                         ccGroups.map((groupname) =>
-                            this.getGroupEmails(groupname)
-                        )
+                            this.getGroupEmails(groupname),
+                        ),
                     );
                     ccEmails = ccEmails.filter(
-                        (email) => !toEmails.includes(email)
+                        (email) => !toEmails.includes(email),
                     ); // 过滤掉toEmails上已包含的人员
                     result = {
                         toEmails,
@@ -629,7 +552,7 @@ export class ConfluenceService {
                         emailTemplate: this.getEmailTemplate(
                             buttonType,
                             originState,
-                            pageTitle
+                            pageTitle,
                         ),
                     };
                     break;
