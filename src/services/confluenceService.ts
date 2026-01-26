@@ -17,6 +17,7 @@ export interface ConfluenceWebhookEvent {
         id: string;
         title: string;
         status: string;
+        url: string;
         space: {
             key: string;
             name: string;
@@ -38,7 +39,7 @@ export interface ConfluenceWebhookEvent {
 enum Email_Template {
     Draft_to_ITL_Reviewer = `Dear internal reviewer,
 
-SOP [SOP Name] has been UPDATED and sent for your review. Please review and provide your approval/reject for this to proceed further.
+SOP "[SOP Name]" has been UPDATED and sent for your review. Please review and provide your approval/reject for this to proceed further.
 If you want to reject, leave your comments and click "Reject" button in the page.
 If you want to approve, click "Approve" for it to move forward.
 
@@ -50,7 +51,7 @@ Regards,
 JSC Knowledge Center`,
     ITL_Reviewer_to_BU_Reviewer = `Dear BU reviewer,
 
-SOP [SOP Name] has been UPDATED, approved by internal reviewer and sent for your review. Please review and provide your approval/reject for this to proceed further. 
+SOP "[SOP Name]" has been UPDATED, approved by internal reviewer and sent for your review. Please review and provide your approval/reject for this to proceed further. 
 If you want to reject, leave your comments and click "Reject" button in the page.
 If you want to approve, click "Approve" for it to move forward.
 
@@ -63,7 +64,7 @@ Regards,
 JSC Knowledge Center`,
     ITL_Reviewer_to_Draft = `Dear SOP Draft Editor,
 
-SOP [SOP Name] has been REJECTED by Internal reviewer. Please review and update the SOP accordingly before submit it again.
+SOP "[SOP Name]" has been REJECTED by Internal reviewer. Please review and update the SOP accordingly before submit it again.
 
 You can find the comments for rejection from the reviewer. Connect with reviewer if nothing's been left.
 
@@ -74,7 +75,7 @@ Regards,
 JSC Knowledge Center`,
     BU_Reviewer_to_Draft = `Dear SOP Draft Editor,
 
-SOP [SOP Name] has been REJECTED by Internal reviewer. Please review and update the SOP accordingly before submit it again.
+SOP "[SOP Name]" has been REJECTED by BU reviewer. Please review and update the SOP accordingly before submit it again.
 
 You can find the comments for rejection from the reviewer. Connect with reviewer if nothing's been left.
 
@@ -85,7 +86,7 @@ Regards,
 JSC Knowledge Center`,
     BU_Reviewer_to_Published = `Dear all,
 
-SOP [SOP Name] has been updated and Approved by all approver. 
+SOP "[SOP Name]" has been updated and Approved by all approver. 
 
 It's now officially PUBLISHED.
 
@@ -101,11 +102,6 @@ enum States_Enum {
     PENDING_ITL_REVIEW = "Pending JSC Review",
     PENDING_BU_REVIEW = "Pending BU Review",
     PUBLISHED = "Published",
-}
-
-interface StatesChangeResult {
-    success: boolean;
-    newStatus?: States_Enum;
 }
 
 type Page_Action = "approve" | "reject" | "re-review";
@@ -128,7 +124,7 @@ export class ConfluenceService {
     private client: AxiosInstance;
 
     constructor() {
-        const baseURL = process.env.CONFLUENCE_BASE_URL;
+        const baseURL = process.env.CONFLUENCE_SERVICE_ACCOUNT_BASE_URL;
         const username = process.env.CONFLUENCE_USERNAME;
         const apiToken = process.env.CONFLUENCE_API_TOKEN;
 
@@ -485,6 +481,7 @@ export class ConfluenceService {
         buttonType: Page_Action,
         originState: States_Enum,
         pageTitle: string,
+        pageUrl: string,
     ): string {
         let template = "";
         if (buttonType === "approve") {
@@ -509,7 +506,9 @@ export class ConfluenceService {
         if (buttonType === "re-review") {
             template = Email_Template.Draft_to_ITL_Reviewer;
         }
-        return template.replace("[SOP Name]", pageTitle);
+        return template
+            .replace("[link]", pageUrl)
+            .replace("[SOP Name]", pageTitle);
     }
 
     /**
@@ -553,6 +552,7 @@ export class ConfluenceService {
                             buttonType,
                             originState,
                             pageTitle,
+                            page.url,
                         ),
                     };
                     break;
