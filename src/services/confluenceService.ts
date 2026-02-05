@@ -207,9 +207,22 @@ export class ConfluenceService {
     /**
      * 获取页面信息 By ID
      */
-    async getPageById(pageId: string): Promise<any> {
+    async getPageById(
+        pageId: string,
+        otherParams?: { versionNumber?: number; bodyFormat?: string },
+    ): Promise<any> {
         try {
-            const response = await this.client.get(`/api/v2/pages/${pageId}`);
+            const response = await this.client.get(
+                `/rest/api/content/${pageId}`,
+                {
+                    params: {
+                        version: otherParams?.versionNumber,
+                        "body-format": otherParams?.bodyFormat,
+                        status: "current",
+                        expand: "body.storage,version,space",
+                    },
+                },
+            );
             return response.data;
         } catch (error) {
             console.error("Error fetching page:", error);
@@ -511,6 +524,21 @@ export class ConfluenceService {
             .replace("[SOP Name]", pageTitle);
     }
 
+    async getIsPageChanged(pageId: string): Promise<boolean> {
+        const currentPageData = await this.getPageById(pageId, {
+            bodyFormat: "storage",
+        });
+        const previousVersionNumber = currentPageData.version.number - 1;
+        const previousVersionData = await this.getPageById(pageId, {
+            versionNumber: previousVersionNumber,
+            bodyFormat: "storage",
+        });
+        const isChanged =
+            currentPageData.body.storage.value !==
+            previousVersionData.body.storage.value;
+        return isChanged;
+    }
+
     /**
      * 根据事件类型处理页面状态变更
      */
@@ -565,6 +593,22 @@ export class ConfluenceService {
                     result = {
                         message: `Unhandled event type: ${event.eventType}`,
                     };
+
+                case "is_page_changed":
+                    const isChanged = await this.getIsPageChanged(page.id);
+                    result = { isChanged };
+                    break;
+                case "change_status_if_page_changed":
+                    const isPageChanged = await this.getIsPageChanged(page.id);
+                    if (isPageChanged) {
+                        await this.changePageStatus(
+                            page.id,
+                            States_Enum.DRAFT,
+                            spaceKey,
+                        );
+                        result = { statusChanged: true };
+                    }
+                    break;
             }
 
             return {
