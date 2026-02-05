@@ -34,6 +34,9 @@ export interface ConfluenceWebhookEvent {
     spaceKey?: string;
     originState?: States_Enum;
     authorName?: string;
+    actions?: {
+        changeStatusTo: States_Enum;
+    };
 }
 
 enum Email_Template {
@@ -543,13 +546,20 @@ export class ConfluenceService {
      * 根据事件类型处理页面状态变更
      */
     async handleWebhookEvent(event: ConfluenceWebhookEvent): Promise<any> {
-        const { page, group, buttonType, spaceKey, originState, authorName } =
+        const { page, buttonType, spaceKey, originState, authorName, actions } =
             event;
         let result: any = {};
 
         try {
             switch (event.eventType) {
                 case "page_updated_get_emails":
+                    if (actions) {
+                        await this.changePageStatus(
+                            page.id,
+                            actions.changeStatusTo,
+                            spaceKey,
+                        );
+                    }
                     // 获取全部页面标题
                     const { toGroups, ccGroups, pageTitle } =
                         await this.getGroupNameAndStateByButtonType(
@@ -589,11 +599,6 @@ export class ConfluenceService {
                     const allStates = await this.getAllPageStates(spaceKey);
                     result = { allStates };
                     break;
-                default:
-                    result = {
-                        message: `Unhandled event type: ${event.eventType}`,
-                    };
-
                 case "is_page_changed":
                     const isChanged = await this.getIsPageChanged(page.id);
                     result = { isChanged };
@@ -609,6 +614,10 @@ export class ConfluenceService {
                         result = { statusChanged: true };
                     }
                     break;
+                default:
+                    result = {
+                        message: `Unhandled event type: ${event.eventType}`,
+                    };
             }
 
             return {
