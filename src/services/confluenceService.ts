@@ -440,29 +440,35 @@ export class ConfluenceService {
             let currentState = states.data.contentState.name;
             let toGroups = [];
             let ccGroups = [];
-            const JSC_GROUP_NAME = groupname + "_JSC Approver";
-            const BU_GROUP_NAME = groupname + "_BU Approver";
-            const Editor_GROUP_NAME = groupname + "_Editor";
-            if (currentState === States_Enum.PENDING_ITL_REVIEW) {
-                toGroups = [JSC_GROUP_NAME];
-                ccGroups = [Editor_GROUP_NAME];
-            }
-            if (currentState === States_Enum.PENDING_BU_REVIEW) {
-                toGroups = [BU_GROUP_NAME];
-                ccGroups = [JSC_GROUP_NAME];
-            }
-            if (currentState === States_Enum.PUBLISHED) {
-                toGroups = [Editor_GROUP_NAME, JSC_GROUP_NAME, BU_GROUP_NAME];
-                ccGroups = [];
-            }
-            if (currentState === States_Enum.DRAFT) {
-                if (originState === States_Enum.PENDING_ITL_REVIEW) {
-                    toGroups = [Editor_GROUP_NAME];
+            if (groupname) {
+                const JSC_GROUP_NAME = groupname + "_JSC Approver";
+                const BU_GROUP_NAME = groupname + "_BU Approver";
+                const Editor_GROUP_NAME = groupname + "_Editor";
+                if (currentState === States_Enum.PENDING_ITL_REVIEW) {
+                    toGroups = [JSC_GROUP_NAME];
+                    ccGroups = [Editor_GROUP_NAME];
+                }
+                if (currentState === States_Enum.PENDING_BU_REVIEW) {
+                    toGroups = [BU_GROUP_NAME];
                     ccGroups = [JSC_GROUP_NAME];
                 }
-                if (originState === States_Enum.PENDING_BU_REVIEW) {
-                    toGroups = [Editor_GROUP_NAME];
-                    ccGroups = [BU_GROUP_NAME, JSC_GROUP_NAME];
+                if (currentState === States_Enum.PUBLISHED) {
+                    toGroups = [
+                        Editor_GROUP_NAME,
+                        JSC_GROUP_NAME,
+                        BU_GROUP_NAME,
+                    ];
+                    ccGroups = [];
+                }
+                if (currentState === States_Enum.DRAFT) {
+                    if (originState === States_Enum.PENDING_ITL_REVIEW) {
+                        toGroups = [Editor_GROUP_NAME];
+                        ccGroups = [JSC_GROUP_NAME];
+                    }
+                    if (originState === States_Enum.PENDING_BU_REVIEW) {
+                        toGroups = [Editor_GROUP_NAME];
+                        ccGroups = [BU_GROUP_NAME, JSC_GROUP_NAME];
+                    }
                 }
             }
             return { toGroups, ccGroups, pageTitle };
