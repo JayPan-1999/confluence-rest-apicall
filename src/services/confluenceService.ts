@@ -1,5 +1,7 @@
 import axios, { AxiosInstance } from "axios";
 
+const ENABLED_WORKFLOW_LABEL = "enable-workflow";
+
 export interface ConfluencePageStatus {
     id: string;
     name: string;
@@ -262,6 +264,21 @@ export class ConfluenceService {
     }
 
     /**
+     * 获取祖先页面
+     */
+    async getAncestorPagesId(pageId: string): Promise<any> {
+        try {
+            const response = await this.client.get(
+                `/api/v2/pages/${pageId}/ancestors`,
+            );
+            return response.data;
+        } catch (error) {
+            console.error("Error fetching ancestor pages:", error);
+            throw error;
+        }
+    }
+
+    /**
      * 获取空间所有页面状态
      */
     async getAllPageStates(spaceKey: string): Promise<any> {
@@ -305,6 +322,28 @@ export class ConfluenceService {
             return response.data;
         } catch (error) {
             console.error("Error changing page status:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * 是否进行工作流流程
+     */
+    async isWorkflowEnabled(pageId: string): Promise<boolean> {
+        try {
+            const data = await this.getAncestorPagesId(pageId);
+            const res = await Promise.all(
+                data.results.map((item: any) => this.getPageLabels(item.id)),
+            );
+            return res.some((item) => {
+                return item.results.some(
+                    (label: any) =>
+                        (label.name as string).toLocaleLowerCase() ===
+                        ENABLED_WORKFLOW_LABEL,
+                );
+            });
+        } catch (error) {
+            console.error("Error checking workflow enabled:", error);
             throw error;
         }
     }
@@ -559,46 +598,55 @@ export class ConfluenceService {
         try {
             switch (event.eventType) {
                 case "page_updated_get_emails":
-                    if (actions) {
-                        await this.changePageStatus(
-                            page.id,
-                            actions.changeStatusTo,
-                            spaceKey,
+                    const isWFEnabled = await this.isWorkflowEnabled(page.id);
+                    if (isWFEnabled) {
+                        if (actions) {
+                            await this.changePageStatus(
+                                page.id,
+                                actions.changeStatusTo,
+                                spaceKey,
+                            );
+                        }
+                        // 获取全部页面标题
+                        const { toGroups, ccGroups, pageTitle } =
+                            await this.getGroupNameAndStateByButtonType(
+                                page.id,
+                                buttonType,
+                                originState,
+                            );
+                        // 获取对应群组信息
+                        let toEmails = await Promise.all(
+                            toGroups.map((groupname) =>
+                                this.getGroupEmails(groupname),
+                            ),
                         );
-                    }
-                    // 获取全部页面标题
-                    const { toGroups, ccGroups, pageTitle } =
-                        await this.getGroupNameAndStateByButtonType(
-                            page.id,
-                            buttonType,
-                            originState,
+                        let ccEmails = await Promise.all(
+                            ccGroups.map((groupname) =>
+                                this.getGroupEmails(groupname),
+                            ),
                         );
-                    // 获取对应群组信息
-                    let toEmails = await Promise.all(
-                        toGroups.map((groupname) =>
-                            this.getGroupEmails(groupname),
-                        ),
-                    );
-                    let ccEmails = await Promise.all(
-                        ccGroups.map((groupname) =>
-                            this.getGroupEmails(groupname),
-                        ),
-                    );
-                    ccEmails = ccEmails.filter(
-                        (email) => !toEmails.includes(email),
-                    ); // 过滤掉toEmails上已包含的人员
-                    result = {
-                        toEmails,
-                        ccEmails,
-                        authorName,
-                        pageTitle,
-                        emailTemplate: this.getEmailTemplate(
-                            buttonType,
-                            originState,
+                        ccEmails = ccEmails.filter(
+                            (email) => !toEmails.includes(email),
+                        ); // 过滤掉toEmails上已包含的人员
+                        result = {
+                            toEmails,
+                            ccEmails,
+                            authorName,
                             pageTitle,
-                            page.url,
-                        ),
-                    };
+                            emailTemplate: this.getEmailTemplate(
+                                buttonType,
+                                originState,
+                                pageTitle,
+                                page.url,
+                            ),
+                        };
+                    } else {
+                        result = {
+                            toEmails: [],
+                            ccEmails: [],
+                            authorName,
+                        };
+                    }
                     break;
                 case "get_all_states":
                     // 如果你想要查看其他的空间状态，可以修改这里的spaceKey
@@ -619,6 +667,10 @@ export class ConfluenceService {
                         );
                         result = { statusChanged: true };
                     }
+                    break;
+                case "get_ancestor_id":
+                    const ancestors = await this.isWorkflowEnabled(page.id);
+                    result = { ancestors };
                     break;
                 default:
                     result = {
