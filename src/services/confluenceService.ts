@@ -452,6 +452,7 @@ export class ConfluenceService {
             const emails = members.results
                 .map((member: any) => member.email)
                 .join(",");
+            console.log(emails)
             return emails;
         } catch (error) {
             console.error("Error fetching group emails:", error);
@@ -620,14 +621,15 @@ export class ConfluenceService {
                                 this.getGroupEmails(groupname),
                             ),
                         );
-                        let ccEmails = await Promise.all(
-                            ccGroups.map((groupname) =>
-                                this.getGroupEmails(groupname),
-                            ),
-                        );
-                        ccEmails = ccEmails.filter(
-                            (email) => !toEmails.includes(email),
-                        ); // 过滤掉toEmails上已包含的人员
+                        // let ccEmails = await Promise.all(
+                        //     ccGroups.map((groupname) =>
+                        //         this.getGroupEmails(groupname),
+                        //     ),
+                        // );
+                        // ccEmails = ccEmails.filter(
+                        //     (email) => !toEmails.includes(email),
+                        // ); // 过滤掉toEmails上已包含的人员
+                        let ccEmails= []
                         result = {
                             toEmails,
                             ccEmails,
